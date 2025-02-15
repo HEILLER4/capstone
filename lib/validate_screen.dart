@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ValidateUserScreen extends StatefulWidget {
   @override
@@ -7,13 +7,13 @@ class ValidateUserScreen extends StatefulWidget {
 }
 
 class _ValidateUserScreenState extends State<ValidateUserScreen> {
-  final TextEditingController studIdController = TextEditingController();
-  final DatabaseReference dbRef = FirebaseDatabase.instance.ref("test_user");
+  final TextEditingController stud_idController = TextEditingController();
 
-  String result = "";
+  // Change from FirebaseDatabase to FirebaseFirestore
+  final CollectionReference dbRef = FirebaseFirestore.instance.collection("users");
 
-  void validateUser() {
-    String studId = studIdController.text.trim();
+  void validateUser() async {
+    String studId = stud_idController.text.trim();
 
     if (studId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -22,36 +22,29 @@ class _ValidateUserScreenState extends State<ValidateUserScreen> {
       return;
     }
 
-    dbRef.once().then((DatabaseEvent event) {
-      bool userFound = false;
-      String userEmail = "";
-      String userSect = "";
+    try {
+      // Query Firestore for the student ID
+      QuerySnapshot querySnapshot = await dbRef.where("stud_id", isEqualTo: studId).get();
 
-      if (event.snapshot.exists) {
-        Map<String, dynamic> users = Map<String, dynamic>.from(event.snapshot.value as Map);
+      if (querySnapshot.docs.isNotEmpty) {
+        var userData = querySnapshot.docs.first.data() as Map<String, dynamic>;
 
-        users.forEach((userId, userData) {
-          if (userData["stud_Id"] == studId) {
-            userFound = true;
-            userEmail = userData["email"];
-            userSect = userData["stud_Sect"];
-          }
+        setState(() {
+          result = "User found!\nEmail: ${userData["email"]}\nSection: ${userData["section"]}";
+        });
+      } else {
+        setState(() {
+          result = "User not found!";
         });
       }
-
-      setState(() {
-        if (userFound) {
-          result = "User found!\nEmail: $userEmail\nSection: $userSect";
-        } else {
-          result = "User not found!";
-        }
-      });
-    }).catchError((error) {
+    } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $error")),
       );
-    });
+    }
   }
+
+  String result = "";
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +54,7 @@ class _ValidateUserScreenState extends State<ValidateUserScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            TextField(controller: studIdController, decoration: InputDecoration(labelText: "Enter Student ID")),
+            TextField(controller: stud_idController, decoration: InputDecoration(labelText: "Enter Student ID")),
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: validateUser,
